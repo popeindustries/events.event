@@ -1,0 +1,15 @@
+{
+	"name": "events.event",
+	"description": "Cross-browser DOM and object events",
+	"version": "0.0.1",
+	"author": "popeindustries <alex@pope-industries.com>",
+	"dependencies": {
+		"env.platform": "git://github.com/popeindustries/env.platform.git#0.0.1",
+		"env.capabilities": "git://github.com/popeindustries/env.capabilities.git#0.0.1"
+	},
+	"main": "index.js",
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/popeindustries/events.event.git"
+	}
+}
