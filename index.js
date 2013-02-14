@@ -4,7 +4,7 @@ var platform = require('env.platform')
 	, doc = win.document
 	, element = null
 	, domListeners = []
-	, id = 0
+	, id = 0;
 
 /**
  * Register for event notification

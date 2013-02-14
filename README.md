@@ -17,6 +17,7 @@ MyClass = function() {
 var myClassInstance = new MyClass();
 myClassInstance.on('customEvent', function(evt) {
 	// Handle custom event
+	console.log(evt.data); // => {one:1, two:2}
 });
 myClassInstance.trigger('customEvent', {one:1, two:2});
 ```
