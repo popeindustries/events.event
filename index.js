@@ -271,7 +271,7 @@ function DomEvent(event, target, type, data) {
 	if (this.domEvent.which) {
 		this.leftClick = this.domEvent.which === 1;
 	} else if (this.domEvent.button) {
-		this.leftClick = (this.domEvent.button is 0 || this.domEvent.button === 2);
+		this.leftClick = (this.domEvent.button === 0 || this.domEvent.button === 2);
 	} else {
 		this.leftClick = true;
 	}
