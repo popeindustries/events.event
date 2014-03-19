@@ -2,7 +2,7 @@
 	"name": "events.event",
 	"description": "Cross-browser DOM and object events",
 	"version": "0.0.2",
-	"author": "popeindustries <alex@pope-industries.com>",
+	"author": "Thomas Lein <thomaslein@gmail.com>",
 	"dependencies": {
 		"env.platform": "git://github.com/thomaslein/env.platform.git",
 		"env.capabilities": "git://github.com/thomaslein/env.capabilities.git"
