@@ -1,358 +1,331 @@
-var platform = require('env.platform')
-	, capabilities = require('env.capabilities')
-	, win = window
-	, doc = win.document
-	, element = null
-	, domListeners = []
-	, id = 0;
+var HTML_EVENTS = 'click dblclick mouseup mousedown contextmenu mousewheel mousemultiwheel DOMMouseScroll mouseover mouseout mousemove selectstart selectend keydown keypress keyup orientationchange focus blur change reset select submit load unload beforeunload resize move DOMContentLoaded readystatechange message error abort scroll show input invalid touchstart touchmove touchend touchcancel gesturestart gesturechange gestureend textinput readystatechange pageshow pagehide popstate hashchange offline online afterprint beforeprint dragstart dragenter dragover dragleave drag drop dragend loadstart progress suspend emptied stalled loadmetadata loadeddata canplay canplaythrough playing waiting seeking seeked ended durationchange timeupdate play pause ratechange volumechange cuechange checking noupdate downloading cached updateready obsolete'
+	, EVENT_PROPS = 'altKey attrChange attrName bubbles cancelable ctrlKey currentTarget detail eventPhase getModifierState isTrusted metaKey relatedNode relatedTarget shiftKey srcElement timeStamp view which propertyName button buttons clientX clientY dataTransfer fromElement offsetX offsetY pageX pageY screenX screenY toElement wheelDelta wheelDeltaX wheelDeltaY wheelDeltaZ char charCode key keyCode keyIdentifier keyLocation location touches targetTouches changedTouches scale rotation data origin source state'
+
+	, domHandlers = {}
+	, uid = 1
+	, htmlEvents = {}
+	, eventProps = {};
+
+// Convert to hash
+for (var i = 0, events = HTML_EVENTS.split(' '), n = events.length; i < n; i++) {
+	htmlEvents[events[i]] = true;
+}
+for (i = 0, events = EVENT_PROPS.split(' '), n = events.length; i < n; i++) {
+	eventProps[events[i]] = true;
+}
 
 /**
  * Register for event notification
- * @param {Object} target
+ * @param {Object} [target]
  * @param {String} type
  * @param {Function} callback
- * @param {Object} data
+ * @returns {Object}
  */
-exports.on = function(target, type, callback, data) {
-	// DOM event
-	if (isValidElement(target)) {
-		// Create custom handler
-		var handler = createHandler(target, type, data, callback);
-		handler.id = id++;
-		// Cache event listener object
-		domListeners.push({
-			target: target,
-			type: type,
-			handler: handler,
-			callback: callback
-		});
-		if (target.domElement) target = target.domElement;
-		type = getType(type);
-		if (target.addEventListener) {
-			target.addEventListener(type, handler, false);
-		} else if (target.attachEvent) {
-			target.attachEvent("on" + type, handler);
+exports.on = function (target, type, callback) {
+	if (typeof target == 'string') {
+		callback = type;
+		type = target;
+		// Assign 'target' to this
+		// if not mixed into an object the target becomes this module
+		target = this;
+	}
+
+	if (!target || !callback) return target;
+
+	if (isElement(target)) {
+		var id = target.getAttribute('data-event-id')
+			, cb = createDOMHandler(callback);
+
+		// Store id on target and create hash
+		if (!id) {
+			id = uid++;
+			target.setAttribute('data-event-id', id);
+			domHandlers[id] = {};
 		}
-	// Custom event
+		// Create cache by event type
+		if (!(type in domHandlers[id])) domHandlers[id][type] = [];
+		// Skip if already registered
+		if (!findInStore(domHandlers[id][type], callback)) {
+			domHandlers[id][type].push({
+				callback: callback,
+				cb: cb
+			});
+			target.addEventListener(type, cb, false);
+		}
+
 	} else {
+		// Store and register
 		if (target._handlers == null) target._handlers = {};
 		if (!(type in target._handlers)) target._handlers[type] = [];
-		target._handlers[type].push(callback);
+		// Skip if already registered
+		if (!findInStore(target._handlers[type], callback)) {
+			target._handlers[type].push({callback: callback});
+		}
 	}
+
 	// Chain
 	return target;
 };
 
 /**
  * Register for one time event notification
- * @param {Object} target
+ * @param {Object} [target]
  * @param {String} type
  * @param {Function} callback
- * @param {Object} data
+ * @returns {Object}
  */
-exports.one = function(target, type, callback, data) {
+exports.once = function (target, type, callback) {
+	if (typeof target == 'string') {
+		callback = type;
+		type = target;
+		// Assign 'target' to this
+		// if not mixed into an object the target becomes this module
+		target = this;
+	}
+
+	if (!target || !callback) return target;
+
 	var cb;
+
 	// Wrap callback
-	exports.on(target, type, cb = function(event) {
-		callback.call(null, event);
-		return exports.off(target, type, cb);
-	}, data);
+	exports.on(target, type, cb = function() {
+		exports.off(target, type, cb);
+		callback.apply(target, arguments);
+	});
+
 	// Chain
 	return target;
 };
 
 /**
  * Unregister for event notification
- * @param {Object} target
+ * @param {Object} [target]
  * @param {String} type
  * @param {Function} callback
+ * @returns {Object}
  */
-exports.off = function(target, type, callback) {
-	// DOM event
-	if (isValidElement(target)) {
-		var listener;
-		if (listener = removeCachedListener(target, type, callback)) {
-			if (target.domElement) target = target.domElement;
-			type = getType(type);
-			if (target.removeEventListener) {
-				target.removeEventListener(type, listener.handler, false);
-			} else if (target.detachEvent) {
-				target.detachEvent("on" + type, listener.handler);
+exports.off = function (target, type, callback) {
+	// TODO: remove all handlers by type if no callback?
+	if (typeof target == 'string') {
+		callback = type;
+		type = target;
+		// Assign 'target' to this
+		// if not mixed into an object the target becomes this module
+		target = this;
+	}
+
+	if (!target || !callback) return target;
+
+	if (isElement(target)) {
+		var id = target.getAttribute('data-event-id')
+			, item;
+
+		// Retrieve from cache
+		if (id && domHandlers[id] && domHandlers[id][type]) {
+			// Remove
+			if (item = findInStore(domHandlers[id][type], callback, true)) {
+				target.removeEventListener(type, item.cb, false);
 			}
 		}
-	// Custom event
+
 	} else {
-		var handlers = target._handlers[type];
-		for (var i = 0, n = handlers.length; i < n; i++) {
-			if (callback === handlers[i]) {
-				target.handlers.splice(i, 1);
-				break;
-			}
+		if (target._handlers && target._handlers[type]) {
+			// Remove
+			findInStore(target._handlers[type], callback, true);
 		}
 	}
+
 	// Chain
 	return target;
 };
 
 /**
  * Unregister all events
- * @param {Object} target
+ * @param {Object} [target]
+ * @returns {Object}
  */
-exports.offAll = function(target) {
-	// DOM event
-	if (isValidElement(target)) {
-		var listener;
-		for (var i = 0, n = domListeners.length; i < n; i++) {
-			listener = domListeners[i];
-			if (target === (listener.target.domElement || listener.target)) {
-				exports.off(listener.target, listener.type, listener.callback);
-			}
-		}
-	// Custom event
-	} else {
-		target._handlers = null;
+exports.offAll = function (target) {
+	if (!target) {
+		// Assign 'target' to this
+		// if not mixed into an object the target becomes this module
+		target = this;
 	}
+
+	if (isElement(target)) {
+		var id = target.getAttribute('data-event-id');
+
+		if (id && domHandlers[id]) {
+			// Unregister all events
+			for (var type in domHandlers[id]) {
+				for (var i = 0, n = domHandlers[id][type].length; i < n; i++) {
+					target.removeEventListener(type, domHandlers[id][type][i].cb, false);
+				}
+			}
+			// Clear cache
+			domHandlers[id] = {};
+		}
+	} else {
+		// Clear cache
+		target._handlers = {};
+	}
+
 	// Chain
 	return target;
 };
 
 /**
  * Dispatch an event to registered listeners
- * @param {Object} target
- * @param {String} type
- * @param {Object} data
+ * @param {Object} [target]
+ * @param {String|Object} type
+ * @param {Object} [data]
+ * @returns {Object}
  */
-exports.trigger = function(target, type, data) {
-	var callback, evt, list;
-	// Custom event
-	if (!isValidElement(target)) {
+exports.trigger = function (target, type, data) {
+	if (typeof target == 'string') {
+		data = type;
+		type = target;
+		// Assign 'target' to this
+		// if not mixed into an object the target becomes this module
+		target = this;
+	}
+
+	if (!target) return null;
+
+	var evt, list;
+
+	if (isElement(target)) {
+		// Create DOM event based on type
+		var isHtmlEvent = type in htmlEvents;
+		evt = document.createEvent(isHtmlEvent ? 'HTMLEvents' : 'UIEvents');
+		evt[isHtmlEvent ? 'initEvent' : 'initUIEvent'](type, true, true, window, 1);
+		evt.data = data;
+		return target.dispatchEvent(evt);
+	} else {
+		// Re-trigger: handle passed in event object
+		if ('object' == typeof type) {
+				evt = type;
+				evt.relatedTarget = evt.target;
+				evt.target = target;
+				type = evt.type;
+		}
+
 		if (target._handlers && type in target._handlers) {
+			evt = evt || new Event({target:target, type:type, data:data});
 			// copy the callback hash to avoid mutation errors
 			list = target._handlers[type].slice();
-			evt = new Event(target, type, data);
 			// skip loop if only a single listener
 			if (list.length == 1) {
-				list[0].call(target, evt);
+				list[0].callback.call(target, evt);
 			} else {
 				for (var i = 0, n = list.length; i < n; i++) {
-					list[i].call(target, evt);
+					// Exit if event has been stopped
+					if (evt.isStopped) break;
+					list[i].callback.call(target, evt);
 				}
 			}
-			// Chain
-			return target;
+			return true;
 		}
 	}
+	return false;
 };
 
+exports._handlers = null;
+
 /**
- * Decorate 'target' with dispatcher behaviour
- * @param {Object} target
+ * Find 'callback' in 'store' and optionally 'remove'
+ * @param {Array} store
+ * @param {Function} callback
+ * @param {Boolean} [remove]
+ * @returns {Object}
  */
-exports.dispatcher = function(target) {
-	// Custom event
-	if (!isValidElement(target)) {
-		target['on'] = function(type, callback) { return exports.on(this, type, callback); };
-		target['off'] = function(type, callback) { return exports.off(this, type, callback); };
-		target['one'] = function(type, callback) { return exports.one(this, type, callback); };
-		target['trigger'] = function(type, data) { return exports.trigger(this, type, data); };
+function findInStore (store, callback, remove) {
+	var item;
+
+	for (var i = 0, n = store.length; i < n; i++) {
+		item = store[i];
+		if (item.callback === callback) {
+			if (remove) store.splice(i, 1);
+			return item;
+		}
 	}
-};
+
+	return null;
+}
 
 /**
- * Determine if 'element' is a valid DOM element
- * @param {Object} element
- * @returns {Boolean}
- */
-function isValidElement (element) {
-	return !!(element
-		&& ((element.domElement != null)
-		|| element === win
-		|| element.nodeType === 9
-		|| element.nodeType === 1));
-};
-
-/**
- * Create handler function
- * @param {Object} target
- * @param {String} type
- * @param {Object} data
+ * Wrap 'callback' handler
  * @param {Function} callback
  * @returns {Function}
  */
-function createHandler(target, type, data, callback) {
-	return function(event) {
-		return callback(new DomEvent(event, target, type, data));
-	};
-};
-
-/**
- * Remove listener object from cache
- * @param {Object} target
- * @param {String} type
- * @param {Function} callback
- */
-function removeCachedListener(target, type, callback) {
-	var item;
-	for (var i = 0, n = domListeners.length; i < n; i++) {
-		item = domListeners[i];
-		if ((item.target.domElement === target.domElement || item.target === target)
-			&& item.type === type
-			&& item.callback === callback) {
-				return domListeners.splice(i, 1)[0];
-		}
+function createDOMHandler (callback) {
+	return function (evt) {
+		callback(new Event(evt));
 	}
-};
-
-/**
- * Convert mouse events to touch equivalents
- * @param {String} type
- * @returns {String}
- */
-function getType(type) {
-	if (capabilities.hasTouch()) {
-		switch (type) {
-			case 'mousedown':
-				type = 'touchstart';
-				break;
-			case 'mousemove':
-				type = 'touchmove';
-				break;
-			case 'mouseup':
-				type = 'touchend';
-				break;
-		}
-	}
-	return type;
-};
-
-/**
- * Event class
- * @param {Object} target
- * @param {String} type
- * @param {Object} data
- */
-function Event(target, type, data) {
-	this.target = target;
-	this.type = type;
-	this.data = data;
 }
 
 /**
- * DomEvent class
+ * Determine if 'element' is a DOMElement
+ * @param {Object} element
+ * @returns {Boolean}
+ */
+function isElement (element) {
+	return !!(element
+		&& (element === window
+		|| element.nodeType === 9
+		|| element.nodeType === 1));
+}
+
+/**
+ * Constructor
  * @param {Object} event
- * @param {Object} target
- * @param {String} type
- * @param {Object} data
  */
-function DomEvent(event, target, type, data) {
-	this.type = type;
-	this.data = data;
-	this.domEvent = event || win.event;
-	this.currentTarget = target;
-	this.target = this.domEvent.target || this.domEvent.srcElement || win;
-	// Text node parent
-	if (this.target.nodeType === 3) this.target = this.target.parentNode;
-	// Convert to Element if necessary
-	if (!this.target.domElement && this.target.nodeType === 1) {
-		// Late retrieval to prevent circular dependency returning empty object
-		if (element == null) element = require('dom.element');
-		this.target = element(this.target);
+function Event (event) {
+	var target = event.target || event.srcElement;
+
+	this.isStopped = false;
+	this.originalEvent = event;
+	this.type = event.type;
+	this.target = target;
+
+	// Fix targets
+	if (target) {
+		// Avoid text nodes
+		if (target.nodeType === 3) this.target = target.parentNode;
+		// SVG element
+		if (target.correspondingUseElement || target.correspondingElement) this.target = target.correspondingUseElement || target.correspondingElement;
 	}
 
-	// Right click
-	if (this.domEvent.which) {
-		this.rightClick = this.domEvent.which === 3;
-	} else if (this.domEvent.button) {
-		this.rightClick = this.domEvent.button === 2;
-	} else {
-		this.rightClick = false;
-	}
-	// Left click
-	if (this.domEvent.which) {
-		this.leftClick = this.domEvent.which === 1;
-	} else if (this.domEvent.button) {
-		this.leftClick = (this.domEvent.button === 0 || this.domEvent.button === 2);
-	} else {
-		this.leftClick = true;
+	// Copy properties
+	for (var prop in eventProps) {
+		if (eventProps.hasOwnProperty(prop)) this[prop] = event[prop];
 	}
 
-	if (this.type === 'mousedown' || this.type === 'mousemove') {
-		// Global coordinates
-		if (this.domEvent.touches) {
-			this.touches = this.domEvent.touches;
-			if (this.touches.length) {
-				this.pageX = this.touches[0].pageX;
-				this.pageY = this.touches[0].pageY;
-			}
-		} else {
-			this.pageX = this.domEvent.pageX != null ? this.domEvent.pageX : this.domEvent.clientX + doc.body.scrollLeft + doc.documentElement.scrollLeft;
-			this.pageY = this.domEvent.pageY != null ? this.domEvent.pageY : this.domEvent.clientY + doc.body.scrollTop + doc.documentElement.scrollTop;
-		}
-		// Local coordinates
-		if ((this.domEvent.offsetX != null)
-			&& (this.domEvent.offsetY != null)
-			&& (this.domEvent.offsetX !== 0
-			&& this.domEvent.offsetY !== 0)) {
-				this.x = this.domEvent.offsetX;
-				this.y = this.domEvent.offsetY;
-		} else if ((this.domEvent.x != null)
-			&& (this.domEvent.y != null)) {
-				this.x = this.domEvent.x;
-				this.y = this.domEvent.y;
-		} else {
-			var pos = this.target.domElement ? this.target.position() : {left: this.target.offsetLeft, top: this.target.offsetTop};
-			this.x = this.pageX ? this.pageX - pos.left : 0;
-			this.y = this.pageY ? this.pageY - pos.top : 0;
-		}
+	// Fix properties
+	this.keyCode = event.keyCode || event.which;
+	this.rightClick = event.which === 3 || event.button === 2;
+	if (event.pageX || event.pageY) {
+		this.clientX = event.pageX;
+		this.clientY = event.pageY;
+	} else if (event.clientX || event.clientY) {
+		this.clientX = event.clientX + document.body.scrollLeft + doc.documentElement.scrollLeft;
+		this.clientY = event.clientY + document.body.scrollTop + doc.documentElement.scrollTop;
 	}
 }
 
-/**
- * Prevent event default
- */
-DomEvent.prototype.preventDefault = function() {
-	if (this.domEvent.preventDefault) {
-		return this.domEvent.preventDefault();
-	} else {
-		return this.domEvent.returnValue = false;
-	}
+Event.prototype.preventDefault = function () {
+	if (this.originalEvent.preventDefault) this.originalEvent.preventDefault();
 };
 
-/**
- * Stop event propagation
- */
-DomEvent.prototype.stopPropagation = function() {
-	if (this.domEvent.stopPropagation) {
-		return this.domEvent.stopPropagation();
-	} else {
-		return this.domEvent.cancelBubble = true;
-	}
+Event.prototype.stopPropagation = function () {
+	if (this.originalEvent.stopPropagation) this.originalEvent.stopPropagation();
 };
 
-/**
- * Prevent event default and stop event propagation
- */
-DomEvent.prototype.stop = function() {
+Event.prototype.stopImmediatePropagation = function () {
+	if (this.originalEvent.stopImmediatePropagation) this.originalEvent.stopImmediatePropagation();
+	this.isStopped = true;
+};
+
+Event.prototype.stop = function () {
 	this.preventDefault();
-	this.stopPropagation();
+	this.stopImmediatePropagation();
 };
-
-/*
-// Enable :active styles on touch devices
-if (capabilities.hasTouch()) {
-	exports.on(doc, 'touchstart', function(){});
-}
-*/
-
-// Clear handlers on window unload to prevent memory leaks (IE)
-if ((win != null) && win.attachEvent && !win.addEventListener) {
-	win.attachEvent('onunload', function() {
-		var listener;
-		for (var i = 0, n = domListeners.length; i < n; i++) {
-			listener = domListeners[i];
-			try {
-				exports.off(listener.target, listener.type, listener.callback);
-			} catch (e) { }
-		}
-	});
-}
