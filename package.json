@@ -1,5 +1,5 @@
 {
-  "name": "event",
+  "name": "events.event",
   "description": "A simple object event system",
   "version": "0.0.2",
   "author": "Thomas Lein <thomaslein@gmail.com>",
