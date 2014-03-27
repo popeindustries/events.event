@@ -4,8 +4,8 @@ var Canvas = require('term-canvas')
 
 var sauce = new MochaSauce({
 	name: 'Event',
-	username: 'popeindustries-nrk',
-	accessKey: process.env.SAUCE_API_KEY_NRK,
+	username: 'thomasl',
+	accessKey: '',
 	host: 'localhost',
 	port: 4445,
 	url: 'http://localhost:8000/test/test-runner.html',
