@@ -7,7 +7,7 @@ try {
 	require('./sauce.js');
 // .. or browser
 } catch (err) {
-	event = require('./event');
+	event = require('./events.event');
 	expect = window.expect;
 }
 
