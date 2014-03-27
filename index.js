@@ -328,4 +328,8 @@ Event.prototype.stopImmediatePropagation = function () {
 Event.prototype.stop = function () {
 	this.preventDefault();
 	this.stopImmediatePropagation();
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> FETCH_HEAD
