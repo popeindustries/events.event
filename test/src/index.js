@@ -1,0 +1,2 @@
+require('trait');
+require('../../');

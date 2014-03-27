@@ -1,15 +1,36 @@
 {
-	"name": "events.event",
-	"description": "Cross-browser DOM and object events",
-	"version": "0.0.2",
-	"author": "Thomas Lein <thomaslein@gmail.com>",
-	"dependencies": {
-		"env.platform": "git://github.com/thomaslein/env.platform.git",
-		"env.capabilities": "git://github.com/thomaslein/env.capabilities.git"
-	},
-	"main": "index.js",
-	"repository": {
-		"type": "git",
-		"url": "git://github.com/thomaslein/events.event.git"
-	}
+  "name": "event",
+  "description": "A simple object event system",
+  "version": "0.0.2",
+  "author": "Thomas Lein <thomaslein@gmail.com>",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "mocha": "*",
+    "expect.js": "*",
+    "buddy": "*",
+    "mocha-sauce": "git://github.com/pbakaus/mocha-sauce.git",
+    "term-canvas": "*",
+    "trait": "git://github.com/YR/trait.git"
+  },
+  "main": "index.js",
+  "repository": "git://github.com/thomaslein/events.event.git",
+  "scripts": {
+    "test": "buddy build && mocha-phantomjs test/test-runner.html",
+    "sauce": "node test/sauce.js"
+  },
+  "buddy": {
+    "build": {
+      "js": {
+        "targets": [{
+          "input": "test/src/index.js",
+          "output": "test/event.js",
+          "boilerplate": true
+        }]
+      }
+    },
+    "server": {
+      "port": 8000
+    }
+  }
 }
