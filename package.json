@@ -3,15 +3,15 @@
   "description": "A simple object event system",
   "version": "0.0.2",
   "author": "Thomas Lein <thomaslein@gmail.com>",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
-    "mocha": "*",
+    "buddy": "^1.3.4",
     "expect.js": "*",
-    "buddy": "*",
+    "mocha": "*",
+    "mocha-phantomjs": "^3.5.3",
     "mocha-sauce": "git://github.com/pbakaus/mocha-sauce.git",
-    "term-canvas": "*",
-    "trait": "git://github.com/YR/trait.git"
+    "phantomjs": "^1.9.16",
+    "term-canvas": "*"
   },
   "main": "index.js",
   "repository": "git://github.com/thomaslein/events.event.git",
@@ -22,11 +22,13 @@
   "buddy": {
     "build": {
       "js": {
-        "targets": [{
-          "input": "test/src/index.js",
-          "output": "test/event.js",
-          "boilerplate": true
-        }]
+        "targets": [
+          {
+            "input": "test/src/index.js",
+            "output": "test/event.js",
+            "boilerplate": true
+          }
+        ]
       }
     },
     "server": {

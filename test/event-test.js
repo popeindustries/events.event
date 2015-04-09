@@ -1,5 +1,4 @@
-var trait = require('trait')
-	, expect, event;
+var expect, event;
 
 try {
 	event = require('../index.js');
@@ -214,16 +213,6 @@ describe('event', function () {
 				expect(evt.target._handlers.hey).to.have.length(0);
 			});
 			event.trigger('hey');
-		});
-	});
-
-	describe('traits', function () {
-		it('should be composable as a trait', function () {
-			var t = trait(event).create(Object.prototype);
-			t.on('hey', function (evt) {
-				expect(evt.type).to.eql('hey');
-			});
-			t.trigger('hey');
 		});
 	});
 });
